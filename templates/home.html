@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Portal — Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { min-height: 100vh; background: linear-gradient(135deg, #0f2027, #203a43, #2c5364); font-family: Segoe UI, Roboto, Arial; color: white; padding-bottom: 40px; }
+    .logo { height: 55px; }
+    h3 { font-weight: 600; }
+    .card { background: rgba(255,255,255,0.06); backdrop-filter: blur(8px); border: none; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.28); color: white; transition: all .18s ease; }
+    .card:hover { transform: translateY(-3px); }
+    .table { color: white; }
+    .table th { color: #cbd5f5; font-weight: 600; }
+    .table td { border-top: 1px solid rgba(255,255,255,0.06); }
+    .btn { border-radius: 8px; font-size: 14px; padding: 6px 12px; }
+    .btn-success { background: #16a34a; border: none; }
+    .btn-danger { background: #dc2626; border: none; }
+    .btn-primary { background: #2563eb; border: none; }
+    .btn-info { background: #0ea5e9; border: none; color: white; }
+    .small-muted { color: rgba(255,255,255,0.75); font-size: 0.9rem; }
+    .muted-block { color: rgba(255,255,255,0.6); padding: 14px; border-radius: 8px; background: rgba(255,255,255,0.02); }
+    .badge-pending { background: #f59e0b; color: #000; padding: 6px 8px; border-radius: 8px; font-weight: 600; }
+    .badge-approved { background: #10b981; color: #fff; padding: 6px 8px; border-radius: 8px; font-weight: 600; }
+    .modal-content.bg-dark { background: rgba(10,10,10,0.9); border-radius: 12px; color: #fff; }
+    .cv-link { color: #93c5fd; text-decoration: underline; }
+    .notifications-bell { position: relative; cursor: pointer; }
+    .notifications-count { position: absolute; right: -6px; top: -6px; background: #ef4444; color: #fff; font-size: 12px; padding: 3px 6px; border-radius: 999px; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+    .notify-list { max-height: 320px; overflow: auto; }
+    .notify-item { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.03); }
+    .small-muted-2 { color: rgba(255,255,255,0.55); font-size: 0.85rem; }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+    @media (max-width: 800px) { .header-actions { gap: 6px; } .logo { height: 40px; } }
+  </style>
+</head>
+<body>
+  <div id="app" class="container py-4" data-role="{{ role }}" data-name="{{ name }}">
+
+    <div class="d-flex align-items-center justify-content-between mb-4">
+      <div class="d-flex align-items-center">
+        <img src="/static/logo.png" alt="logo" class="logo me-3">
+        <div>
+          <div style="font-size:1.05rem; color: #eaf6ff">Welcome</div>
+          <div style="font-size:1.5rem; font-weight:700;" v-text="nameValue"></div>
+          <div class="small-muted">Role: <strong v-text="roleValue"></strong></div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <div class="notifications-bell" @click="toggleNotifications()" title="Notifications">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6 6 0 1 0-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          <div v-if="unreadCount>0" class="notifications-count" v-text="unreadCount"></div>
+        </div>
+
+        <div v-if="showNotifications" class="card p-2" style="width:320px; position:absolute; right:18px; top:70px; z-index:2000;">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>Notifications</strong>
+            <small class="small-muted-2">{{ notifications.length }} total</small>
+          </div>
+          <div class="notify-list">
+            <div v-if="notifications.length===0" class="muted-block">No notifications.</div>
+            <div v-for="n in notifications" :key="'n-'+n.id" class="notify-item d-flex justify-content-between align-items-start">
+              <div>
+                <div v-html="n.message"></div>
+                <div class="small-muted-2 mt-1" v-text="n.read ? 'read' : 'unread'"></div>
+              </div>
+              <div class="text-end">
+                <button v-if="!n.read" class="btn btn-sm btn-primary" @click="markNotificationRead(n.id)">Mark</button>
+              </div>
+            </div>
+          </div>
+          <div class="mt-2 text-end">
+            <button class="btn btn-sm btn-secondary" @click="showNotifications=false">Close</button>
+          </div>
+        </div>
+        <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
+      </div>
+    </div>
+
+    <div v-if="roleValue === 'employee'">
+      <div class="row mb-4 g-3">
+        <div class="col-md-3"><div class="card p-3 text-center"><div class="small-muted">Students Pending</div><div class="h2 mt-2" v-text="students.length"></div></div></div>
+        <div class="col-md-3"><div class="card p-3 text-center"><div class="small-muted">Companies Pending</div><div class="h2 mt-2" v-text="companies.length"></div></div></div>
+        <div class="col-md-3"><div class="card p-3 text-center"><div class="small-muted">Employees Pending</div><div class="h2 mt-2" v-text="employees.length"></div></div></div>
+        <div class="col-md-3"><div class="card p-3 text-center"><div class="small-muted">Jobs Pending</div><div class="h2 mt-2" v-text="pendingJobs.length"></div></div></div>
+      </div>
+
+      <div class="mb-3">
+        <div class="card p-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <strong>Admin Controls</strong>
+              <div class="small-muted-2">Your power: <strong v-text="employeePower"></strong></div>
+            </div>
+            <div>
+              <button class="btn btn-sm btn-primary me-1" @click="refreshAll()">Refresh</button>
+              <button class="btn btn-sm btn-outline-secondary" @click="openSearch()">Search students</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="section-title">Students awaiting approval</div>
+              <div class="small-muted">Total: <span v-text="students.length"></span></div>
+            </div>
+            <div v-if="students.length === 0" class="muted-block">No pending student requests.</div>
+            <table v-else class="table table-borderless mb-0">
+              <thead><tr><th>ID</th><th>Name</th><th>Email</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="s in students" :key="'s-'+s.id">
+                  <td v-text="s.id"></td>
+                  <td v-text="s.name"></td>
+                  <td v-text="s.email"></td>
+                  <td class="text-end">
+                    <button class="btn btn-success btn-sm me-1" @click="approveUser('student', s.id)" :disabled="!canApprove">Approve</button>
+                    <button class="btn btn-outline-danger btn-sm" @click="rejectUser('student', s.id)" :disabled="!canApprove">Reject</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="section-title">Approved students</div>
+              <div class="small-muted">Total: <span v-text="approvedStudents.length"></span></div>
+            </div>
+            <div v-if="approvedStudents.length === 0" class="muted-block">No approved students yet.</div>
+            <table v-else class="table table-borderless mb-0">
+              <thead><tr><th>ID</th><th>Name</th><th>Email</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="s in approvedStudents" :key="'as-'+s.id">
+                  <td v-text="s.id"></td>
+                  <td v-text="s.name"></td>
+                  <td v-text="s.email"></td>
+                  <td class="text-end">
+                    <button v-if="s.status !== 'blocked'" class="btn btn-sm btn-outline-danger me-1" @click="blockUser('student', s.id)" :disabled="!canBlock">Block</button>
+                    <button v-else class="btn btn-sm btn-outline-success me-1" @click="unblockUser('student', s.id)" :disabled="!canBlock">Unblock</button>
+                    <button class="btn btn-sm btn-danger" @click="deleteUser('student', s.id)" :disabled="!canDelete">Delete</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="section-title">Companies awaiting approval</div>
+              <div class="small-muted">Total: <span v-text="companies.length"></span></div>
+            </div>
+            <div v-if="companies.length === 0" class="muted-block">No pending company requests.</div>
+            <table v-else class="table table-borderless mb-0">
+              <thead><tr><th>ID</th><th>Company</th><th>Email</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="c in companies" :key="'c-'+c.id">
+                  <td v-text="c.id"></td>
+                  <td v-text="c.name"></td>
+                  <td v-text="c.email"></td>
+                  <td class="text-end">
+                    <button class="btn btn-success btn-sm me-1" @click="approveUser('company', c.id)" :disabled="!canApprove">Approve</button>
+                    <button class="btn btn-outline-danger btn-sm" @click="rejectUser('company', c.id)" :disabled="!canApprove">Reject</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="section-title">Approved companies</div>
+              <div class="small-muted">Total: <span v-text="approvedCompanies.length"></span></div>
+            </div>
+            <div v-if="approvedCompanies.length === 0" class="muted-block">No approved companies yet.</div>
+            <table v-else class="table table-borderless mb-0">
+              <thead><tr><th>ID</th><th>Company</th><th>Email</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="c in approvedCompanies" :key="'ac-'+c.id">
+                  <td v-text="c.id"></td>
+                  <td v-text="c.name"></td>
+                  <td v-text="c.email"></td>
+                  <td class="text-end">
+                    <button v-if="c.status !== 'blocked'" class="btn btn-sm btn-outline-danger me-1" @click="blockUser('company', c.id)" :disabled="!canBlock">Block</button>
+                    <button v-else class="btn btn-sm btn-outline-success me-1" @click="unblockUser('company', c.id)" :disabled="!canBlock">Unblock</button>
+                    <button class="btn btn-sm btn-danger" @click="deleteUser('company', c.id)" :disabled="!canDelete">Delete</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="section-title">Employees awaiting approval</div>
+              <div class="small-muted">Total: <span v-text="employees.length"></span></div>
+            </div>
+            <div v-if="employees.length === 0" class="muted-block">No pending employee requests.</div>
+            <table v-else class="table table-borderless mb-0">
+              <thead><tr><th>ID</th><th>Email/Username</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="e in employees" :key="'e-'+e.id">
+                  <td v-text="e.id"></td>
+                  <td v-text="e.username"></td>
+                  <td class="text-end">
+                    <button class="btn btn-success btn-sm me-1" @click="approveUser('employee', e.id)" :disabled="employeePower !== 'full'">Approve</button>
+                    <button class="btn btn-outline-danger btn-sm" @click="rejectUser('employee', e.id)" :disabled="employeePower !== 'full'">Reject</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="section-title">Approved Employees</div>
+              <div class="small-muted">Total: <span v-text="approvedEmployees.length"></span></div>
+            </div>
+            <div v-if="approvedEmployees.length === 0" class="muted-block">No approved employees yet.</div>
+            <table v-else class="table table-borderless mb-0">
+              <thead><tr><th>ID</th><th>Username</th><th>Power</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="e in approvedEmployees" :key="'ae-'+e.id">
+                  <td v-text="e.id"></td>
+                  <td v-text="e.username"></td>
+                  <td>
+                    <select v-model="e.power" class="form-select form-select-sm bg-dark text-white border-secondary" :disabled="employeePower !== 'full'">
+                      <option value="none">None</option>
+                      <option value="approve">Approve Only</option>
+                      <option value="block">Block Only</option>
+                      <option value="full">Full Access</option>
+                    </select>
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-primary" @click="updateEmployeePower(e.id, e.power)" :disabled="employeePower !== 'full'">Update</button>
+                    <button class="btn btn-sm btn-danger ms-1" @click="deleteUser('employee', e.id)" :disabled="employeePower !== 'full'">Delete</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="section-title">Jobs awaiting approval</div>
+              <div class="small-muted">Total: <span v-text="pendingJobs.length"></span></div>
+            </div>
+            <div v-if="pendingJobs.length === 0" class="muted-block">No pending job posts.</div>
+            <table v-else class="table table-borderless mb-0">
+              <thead><tr><th>Title</th><th>Company</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="j in pendingJobs" :key="'pj-'+j.id">
+                  <td v-text="j.title"></td>
+                  <td v-text="j.company"></td>
+                  <td class="text-end">
+                    <button class="btn btn-success btn-sm me-1" @click="approveJob(j.id)" :disabled="!canApprove">Approve</button>
+                    <button class="btn btn-outline-danger btn-sm" @click="rejectJob(j.id)" :disabled="!canApprove">Reject</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="roleValue === 'student'">
+      <div class="row g-3">
+        <div class="col-lg-8">
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="section-title">Available Jobs</div>
+              <div class="small-muted">Click Apply to open form (upload CV)</div>
+            </div>
+            <div v-if="jobs.length === 0" class="muted-block">No jobs available at the moment.</div>
+            <div v-else>
+              <div v-for="job in jobs" :key="'job-'+job.id" class="mb-3">
+                <div class="d-flex justify-content-between">
+                  <div>
+                    <h5 style="margin:0" v-text="job.title"></h5>
+                    <div class="small-muted" v-text="job.description"></div>
+                    <div class="small-muted mt-1">Posted by: <strong v-text="job.company ? job.company : '—'"></strong></div>
+                  </div>
+                  <div class="align-self-center">
+                    <button v-if="hasApplied(job.id)" class="btn btn-secondary" disabled>Already Applied</button>
+                    <button v-else class="btn btn-primary" @click="openApply(job.id)">Apply</button>
+                  </div>
+                </div>
+                <hr />
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-3">
+            <div class="section-title">My Applications</div>
+            <div v-if="myApplications.length === 0" class="muted-block">You have not applied anywhere.</div>
+            <table v-else class="table table-borderless mt-2">
+              <thead><tr><th>Job</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="a in myApplications" :key="'ap-'+a.id">
+                  <td v-text="a.job_title"></td>
+                  <td>
+                    <span v-if="a.status==='applied'" class="badge badge-pending">Applied</span>
+                    <span v-else-if="a.status==='shortlisted'" class="badge badge-approved">Shortlisted</span>
+                    <span v-else-if="a.status==='interview'" class="badge bg-info text-white">Interview Scheduled</span>
+                    <span v-else-if="a.status==='selected'" class="badge bg-success">Hired / Selected</span>
+                    <span v-else class="small-muted" v-text="a.status"></span>
+                  </td>
+                  <td class="text-end">
+                    <button v-if="a.status==='applied'" class="btn btn-sm btn-outline-danger" @click="withdrawApplication(a.id)">Withdraw</button>
+                    <button v-if="a.interview" class="btn btn-sm btn-info text-white" @click="viewInterview(a.interview)">View Interview</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="col-lg-4">
+          <div class="card p-3">
+            <div class="section-title">My Profile</div>
+            <div class="muted-block mb-3">Name: <strong v-text="nameValue"></strong></div>
+            
+            <div class="mb-2">
+              <label class="form-label small-muted mb-0">CGPA</label>
+              <input type="number" step="0.01" v-model="studentProfile.cgpa" class="form-control form-control-sm" placeholder="e.g. 8.5">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small-muted mb-0">Branch</label>
+              <input type="text" v-model="studentProfile.branch" class="form-control form-control-sm" placeholder="e.g. Data Science">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small-muted mb-0">Passing Year</label>
+              <input type="number" v-model="studentProfile.passing_year" class="form-control form-control-sm" placeholder="e.g. 2026">
+            </div>
+            
+            <div class="d-flex gap-2 mb-2">
+              <button class="btn btn-success btn-sm w-100" @click="updateProfile()">Save Profile</button>
+            </div>
+            <button class="btn btn-info btn-sm w-100 text-white" @click="exportCSV()">Export Application History (CSV)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="roleValue === 'company'">
+      <div class="row g-3">
+        <div class="col-lg-6">
+          <div class="card p-3 mb-3">
+            <div class="section-title">Post a Job</div>
+            <input v-model="newJob.title" class="form-control mb-2" placeholder="Job title">
+            <textarea v-model="newJob.description" class="form-control mb-2" placeholder="Job description"></textarea>
+            
+            <div class="row g-2 mb-2">
+              <div class="col-md-4">
+                <input type="number" step="0.01" v-model="newJob.cgpa" class="form-control form-control-sm" placeholder="Min CGPA">
+              </div>
+              <div class="col-md-4">
+                <input type="text" v-model="newJob.branch" class="form-control form-control-sm" placeholder="Req. Branch">
+              </div>
+              <div class="col-md-4">
+                <input type="number" v-model="newJob.year" class="form-control form-control-sm" placeholder="Batch Year">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="small-muted">Application Deadline</label>
+              <input type="date" v-model="newJob.deadline" class="form-control form-control-sm">
+            </div>
+          
+            <div class="d-flex gap-2">
+              <button class="btn btn-success" @click="postJob()">Post</button>
+              <button class="btn btn-outline-secondary" @click="newJob={title:'',description:'', cgpa:'', branch:'', year:'', deadline:''}">Clear</button>
+            </div>
+          </div>
+
+          <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="section-title">My Jobs</div>
+              <div class="small-muted">Click View to see applicants</div>
+            </div>
+            <div v-if="companyJobs.length===0" class="muted-block">You have no jobs.</div>
+            <table v-else class="table table-borderless">
+              <thead><tr><th>Title</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="j in companyJobs" :key="'cj-'+j.id">
+                  <td v-text="j.title"></td>
+                  <td>
+                    <span v-if="j.status==='pending'" class="badge badge-pending">Pending</span>
+                    <span v-else-if="j.status==='approved'" class="badge badge-approved">Approved</span>
+                    <span v-else class="small-muted" v-text="j.status"></span>
+                  </td>
+                  <td class="text-end">
+                    <button class="btn btn-sm btn-primary me-1" @click="openApplicants(j.id)">View</button>
+                    <button class="btn btn-sm btn-outline-danger" @click="deleteJob(j.id)">Delete</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="card p-3">
+            <div class="section-title">Company Info</div>
+            <div class="muted-block">Name: <span v-text="nameValue"></span></div>
+            
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="applyModal" tabindex="-1" aria-hidden="true" ref="applyModal">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white">
+          <div class="modal-header border-0">
+            <h5 class="modal-title">Apply for job</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-2"><strong>Job:</strong> <span v-text="applyingJobTitle ? applyingJobTitle : '—'"></span></div>
+            <div class="mb-2">
+              <label class="form-label small-muted">Highest education</label>
+              <input v-model="applyForm.education" class="form-control" placeholder="e.g. BTech / MSc / Diploma">
+            </div>
+            <div class="mb-2">
+              <label class="form-label small-muted">Upload CV (pdf / doc / docx)</label>
+              <input id="cvfile" ref="cvfile" type="file" class="form-control" accept=".pdf,.doc,.docx">
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary" @click="submitApplication()">Submit Application</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="applicantsModal" tabindex="-1" aria-hidden="true" ref="applicantsModal">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content bg-dark text-white">
+          <div class="modal-header border-0">
+            <h5 class="modal-title">Applicants</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div v-if="currentApplicants.length === 0" class="muted-block">No applicants yet.</div>
+            <table v-else class="table table-borderless">
+              <thead><tr><th>Name</th><th>Education</th><th>CV</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="a in currentApplicants" :key="'ap-'+a.id">
+                  <td v-text="a.name"></td>
+                  <td v-text="a.education"></td>
+                  <td><a :href="`/uploads/${a.cv}`" target="_blank" class="cv-link">View CV</a></td>
+                  <td>
+                    <span v-if="a.status==='applied'" class="badge badge-pending">Applied</span>
+                    <span v-else-if="a.status==='shortlisted'" class="badge badge-approved">Shortlisted</span>
+                    <span v-else-if="a.status==='interview'" class="badge bg-info text-white">Interview</span>
+                    <span v-else-if="a.status==='selected'" class="badge bg-success">Selected</span>
+                    <span v-else class="small-muted" v-text="a.status"></span>
+                  </td>
+                  <td class="text-end">
+                    <button v-if="a.status==='applied'" class="btn btn-sm btn-success me-1" @click="approveApplicant(a.id)">Shortlist</button>
+                    <button v-if="a.status==='applied'" class="btn btn-sm btn-outline-danger" @click="rejectApplicant(a.id)">Reject</button>
+                    <button v-if="a.status==='shortlisted'" class="btn btn-sm btn-info me-1" @click="openInterviewModal(a.id)">Schedule Interview</button>
+                    <button v-if="a.status==='interview'" class="btn btn-sm btn-success me-1" @click="selectStudent(a.id)">Select Student</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="modal-footer border-0">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="interviewModal" tabindex="-1" aria-hidden="true" ref="interviewModal">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white">
+          <div class="modal-header border-0">
+            <h5 class="modal-title">Schedule Interview</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label small-muted">Date</label>
+              <input type="date" v-model="interviewForm.date" class="form-control">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small-muted">Time</label>
+              <input type="time" v-model="interviewForm.time" class="form-control">
+            </div>
+            <div class="mb-3">
+              <label class="form-label small-muted">Location / Meeting Link</label>
+              <input type="text" v-model="interviewForm.location" class="form-control" placeholder="e.g. Zoom link or Office address">
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary" @click="submitInterview()">Schedule</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="studentInterviewModal" tabindex="-1" aria-hidden="true" ref="studentInterviewModal">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-white">
+          <div class="modal-header border-0">
+            <h5 class="modal-title">Your Interview Details</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body" v-if="viewingInterview">
+            <div class="mb-3">
+              <label class="small-muted d-block">Date</label>
+              <strong v-text="viewingInterview.date"></strong>
+            </div>
+            <div class="mb-3">
+              <label class="small-muted d-block">Time</label>
+              <strong v-text="viewingInterview.time"></strong>
+            </div>
+            <div class="mb-3">
+              <label class="small-muted d-block">Location / Meeting Link</label>
+              <strong v-text="viewingInterview.location"></strong>
+            </div>
+          </div>
+          <div class="modal-footer border-0">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div> 
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+
+  <script src="/static/home.js"></script>
+</body>
+</html>
